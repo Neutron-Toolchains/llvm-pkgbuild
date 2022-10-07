@@ -2,7 +2,7 @@
 # Contributor: Jan "heftig" Steffens <jan.steffens@gmail.com>
 
 pkgname=lld
-pkgver=14.0.6
+pkgver=15.0.2
 pkgrel=1
 pkgdesc="Linker from the LLVM project"
 arch=('x86_64')
@@ -10,18 +10,14 @@ url="https://lld.llvm.org/"
 license=('custom:Apache 2.0 with LLVM Exception')
 depends=('llvm-libs')
 makedepends=('llvm' 'cmake' 'ninja' 'python-sphinx')
-options=('!lto') # LTO causes a couple of test failures
+options=('!debug' 'lto')
 _source_base=https://github.com/llvm/llvm-project/releases/download/llvmorg-$pkgver
-source=($_source_base/lld-$pkgver.src.tar.xz{,.sig}
-        $_source_base/llvm-$pkgver.src.tar.xz{,.sig}
-        $_source_base/libunwind-$pkgver.src.tar.xz{,.sig})
-sha256sums=('0c28ce0496934d37d20fec96591032dd66af8d10178a45762e0e75e85cf95ad3'
-            'SKIP'
-            '050922ecaaca5781fdf6631ea92bc715183f202f9d2f15147226f023414f619a'
-            'SKIP'
-            '3bbe9c23c73259fe39c045dc87d0b283236ba6e00750a226b2c2aeac4a51d86b'
-            'SKIP')
-validpgpkeys=('474E22316ABF4785A88C6E8EA2C794A986419D8A') # Tom Stellard <tstellar@redhat.com>
+source=($_source_base/lld-$pkgver.src.tar.xz
+        $_source_base/llvm-$pkgver.src.tar.xz
+        $_source_base/libunwind-$pkgver.src.tar.xz)
+sha256sums=('cdac4eef441bd6ac2d7a1b55d6507d90fab77bdb70038e63dffa2d54103a58b3'
+            '8e1443141bac55c1ba9d4b481006ab696787eb42cb6c6d872e02e77db473797c'
+            '3440af8d2c26ea273fc58534a028b5b5684ffb1d3579977c65ef361b427eb959')
 
 prepare() {
   # https://bugs.llvm.org/show_bug.cgi?id=49228
@@ -50,11 +46,6 @@ build() {
   )
   cmake .. "${cmake_args[@]}"
   ninja
-}
-
-check() {
-  cd lld-$pkgver.src/build
-  ninja check-lld
 }
 
 package() {

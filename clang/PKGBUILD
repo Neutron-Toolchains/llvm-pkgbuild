@@ -2,14 +2,15 @@
 # Contributor: Jan "heftig" Steffens <jan.steffens@gmail.com>
 
 pkgname=clang
-pkgver=14.0.6
-pkgrel=3
+pkgver=15.0.2
+pkgrel=1
 pkgdesc="C language family frontend for LLVM"
 arch=('x86_64')
 url="https://clang.llvm.org/"
 license=('custom:Apache 2.0 with LLVM Exception')
 depends=('llvm-libs' 'gcc' 'compiler-rt')
 makedepends=('llvm' 'cmake' 'ninja' 'python-sphinx' 'python-recommonmark')
+options=('!debug' 'lto')
 optdepends=('openmp: OpenMP support in clang with -fopenmp'
             'python: for scan-view and git-clang-format'
             'llvm: referenced by some clang headers')
@@ -17,22 +18,14 @@ provides=("clang-analyzer=$pkgver" "clang-tools-extra=$pkgver")
 conflicts=('clang-analyzer' 'clang-tools-extra')
 replaces=('clang-analyzer' 'clang-tools-extra')
 _source_base=https://github.com/llvm/llvm-project/releases/download/llvmorg-$pkgver
-source=($_source_base/clang-$pkgver.src.tar.xz{,.sig}
-        $_source_base/clang-tools-extra-$pkgver.src.tar.xz{,.sig}
-        $_source_base/llvm-$pkgver.src.tar.xz{,.sig}
-        clang-coroutines-ubsan.patch
-        clang-tidy-fix-standalone-build.patch
+source=($_source_base/clang-$pkgver.src.tar.xz
+        $_source_base/clang-tools-extra-$pkgver.src.tar.xz
+        $_source_base/llvm-$pkgver.src.tar.xz
         enable-fstack-protector-strong-by-default.patch)
-sha256sums=('2b5847b6a63118b9efe5c85548363c81ffe096b66c3b3675e953e26342ae4031'
-            'SKIP'
-            '7cf3b8ff56c65c4d1eae3c56883fc4a6cbc3ff9f3a1530a74d66e45d27271866'
-            'SKIP'
-            '050922ecaaca5781fdf6631ea92bc715183f202f9d2f15147226f023414f619a'
-            'SKIP'
-            '2c25ddf0ba6be01949842873fef4d285456321aaccd4ba95db61b69a4c580106'
-            '081a7ebc1ae524b13fc6be3dc73feb2c9eb7cf4b99f7f13d9ed37a688311f58a'
+sha256sums=('e5ddf021e744be6d838f7be1f7b745b670fb812c371c6dc2d0d584bdabd8a119'
+            '8cf2f76fa6cf90cc7f423706196f4469eb5af92f0d212a61400ef9d482c6dfc2'
+            '8e1443141bac55c1ba9d4b481006ab696787eb42cb6c6d872e02e77db473797c'
             '7a9ce949579a3b02d4b91b6835c4fb45adc5f743007572fb0e28e6433e48f3a5')
-validpgpkeys=('474E22316ABF4785A88C6E8EA2C794A986419D8A') # Tom Stellard <tstellar@redhat.com>
 
 # Utilizing LLVM_DISTRIBUTION_COMPONENTS to avoid
 # installing static libraries; inspired by Gentoo
@@ -61,12 +54,6 @@ prepare() {
   mkdir build
   mv "$srcdir/clang-tools-extra-$pkgver.src" tools/extra
   patch -Np2 -i ../enable-fstack-protector-strong-by-default.patch
-
-  # https://github.com/llvm/llvm-project/issues/49689
-  patch -Np2 -i ../clang-coroutines-ubsan.patch
-
-  # https://github.com/llvm/llvm-project/issues/54116
-  patch -Np0 -i ../clang-tidy-fix-standalone-build.patch
 
   # Attempt to convert script to Python 3
   2to3 -wn --no-diffs \
@@ -103,11 +90,6 @@ build() {
 
   cmake .. "${cmake_args[@]}"
   ninja
-}
-
-check() {
-  cd clang-$pkgver.src/build
-  LD_LIBRARY_PATH=$PWD/lib ninja check-clang{,-tools}
 }
 
 _python_optimize() {
