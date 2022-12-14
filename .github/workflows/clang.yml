@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'clang/**'
 env:
-  GITHUB_USERNAME: dakkshesh07
+  GITHUB_USERNAME: Dakkshesh
   GITHUB_EMAIL: dakkshesh5@gmail.com
-  PKG_VER: 15.0.2
+  PKG_VER: 15.0.6
   REL_VER: 1
   GHUB_TOKEN: ${{ secrets.GHUB_TOKEN }}
 
@@ -25,12 +27,16 @@ jobs:
           git config --global user.name $GITHUB_USERNAME
           git config --global user.email $GITHUB_EMAIL
           gh auth login --with-token <<< $GHUB_TOKEN
+          sed -i "s/.*COMPRESSZST=.*/COMPRESSZST=(zstd -c -z -q -10 -T0 -)/" /etc/makepkg.conf
+          sed -i "s/.*PACKAGER=.*/PACKAGER='Dakkshesh <dakkshesh5@gmail.com>'/" /etc/makepkg.conf
+          sed -i "s/-O2/-O3/" /etc/makepkg.conf
+          sed -i "s/-O1/-O3/" /etc/makepkg.conf
+          sed -i 's/.*LTOFLAGS=.*/LTOFLAGS="-flto=auto -flto-compression-level=10 -ffunction-sections -fdata-sections"/' /etc/makepkg.conf
       - name: Build
         run: |
-          curl -fsSL "https://pkgbuild.com/~morganamilo/pacman-static/x86_64/bin/pacman-static" -o pacman-static && chmod +x pacman-static && mv pacman-static /usr/bin/
-          pip uninstall -y pytz setuptools appdirs && pacman-static -Syu --needed --noconfirm python-sphinx python-recommonmark openmp swig libffi libedit ncurses libxml2 python-setuptools python-psutil
+          pip uninstall -y pytz setuptools appdirs six && pacman -Syu --noconfirm
           cd clang
-          sed -i '/E_ROOT/d' /usr/bin/makepkg && makepkg -s
+          sed -i '/E_ROOT/d' /usr/bin/makepkg && MAKEFLAGS="-j$(nproc --all)" makepkg -s -c -C --noconfirm
           git clone https://github.com/Neutron-Toolchains/llvm-pkgbuild.git rel-repo
           mv *.pkg.tar.zst rel-repo/
           cd rel-repo/

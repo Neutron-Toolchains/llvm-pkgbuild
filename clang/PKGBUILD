@@ -2,14 +2,14 @@
 # Contributor: Jan "heftig" Steffens <jan.steffens@gmail.com>
 
 pkgname=clang
-pkgver=15.0.2
+pkgver=15.0.6
 pkgrel=1
 pkgdesc="C language family frontend for LLVM"
 arch=('x86_64')
 url="https://clang.llvm.org/"
 license=('custom:Apache 2.0 with LLVM Exception')
 depends=('llvm-libs' 'gcc' 'compiler-rt')
-makedepends=('llvm' 'cmake' 'ninja' 'python-sphinx' 'python-recommonmark')
+makedepends=('llvm' 'cmake' 'ninja' 'python-sphinx' 'python-recommonmark' 'ocaml-stdlib-shims')
 options=('!debug' 'lto')
 optdepends=('openmp: OpenMP support in clang with -fopenmp'
             'python: for scan-view and git-clang-format'
@@ -21,11 +21,15 @@ _source_base=https://github.com/llvm/llvm-project/releases/download/llvmorg-$pkg
 source=($_source_base/clang-$pkgver.src.tar.xz
         $_source_base/clang-tools-extra-$pkgver.src.tar.xz
         $_source_base/llvm-$pkgver.src.tar.xz
-        enable-fstack-protector-strong-by-default.patch)
-sha256sums=('e5ddf021e744be6d838f7be1f7b745b670fb812c371c6dc2d0d584bdabd8a119'
-            '8cf2f76fa6cf90cc7f423706196f4469eb5af92f0d212a61400ef9d482c6dfc2'
-            '8e1443141bac55c1ba9d4b481006ab696787eb42cb6c6d872e02e77db473797c'
-            '7a9ce949579a3b02d4b91b6835c4fb45adc5f743007572fb0e28e6433e48f3a5')
+        enable-fstack-protector-strong-by-default.patch
+        0001-Mark-fopenmp-implicit-rpath-as-NoArgumentUnused.patch
+        0001-clang-tools-extra-Make-test-dependency-on-LLVMHello-.patch)
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
 
 # Utilizing LLVM_DISTRIBUTION_COMPONENTS to avoid
 # installing static libraries; inspired by Gentoo
@@ -50,32 +54,41 @@ _get_distribution_components() {
 }
 
 prepare() {
-  cd clang-$pkgver.src
-  mkdir build
-  mv "$srcdir/clang-tools-extra-$pkgver.src" tools/extra
-  patch -Np2 -i ../enable-fstack-protector-strong-by-default.patch
+  mv "$srcdir/clang-$pkgver.src" "clang"
+  mv "$srcdir/clang-tools-extra-$pkgver.src" "clang-tools-extra"
+  patch -Np1 -i ../enable-fstack-protector-strong-by-default.patch
+  patch -Np1 -i ../0001-Mark-fopenmp-implicit-rpath-as-NoArgumentUnused.patch
+  patch -Np1 -i ../0001-clang-tools-extra-Make-test-dependency-on-LLVMHello-.patch
 
   # Attempt to convert script to Python 3
   2to3 -wn --no-diffs \
-    tools/extra/clang-include-fixer/find-all-symbols/tool/run-find-all-symbols.py
+    "$srcdir/clang-tools-extra/clang-include-fixer/find-all-symbols/tool/run-find-all-symbols.py"
+
+  cd clang
+  mkdir build
 }
 
 build() {
-  cd clang-$pkgver.src/build
+  cd clang/build
 
   local cmake_args=(
     -G Ninja
-    -DCMAKE_BUILD_TYPE=Release
-    -DCMAKE_INSTALL_PREFIX=/usr
-    -DCMAKE_INSTALL_DOCDIR=share/doc
-    -DCMAKE_SKIP_RPATH=ON
+    -DCLANG_BUILD_EXAMPLES:BOOL=OFF
     -DCLANG_DEFAULT_PIE_ON_LINUX=ON
+    -DCLANG_INCLUDE_DOCS:BOOL=ON
+    -DCLANG_INCLUDE_TESTS:BOOL=ON
     -DCLANG_LINK_CLANG_DYLIB=ON
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_INSTALL_DOCDIR=share/doc
+    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_SKIP_RPATH=ON
     -DENABLE_LINKER_BUILD_ID=ON
     -DLLVM_BUILD_DOCS=ON
     -DLLVM_BUILD_TESTS=ON
+    -DLLVM_BUILD_UTILS:BOOL=ON
     -DLLVM_ENABLE_RTTI=ON
     -DLLVM_ENABLE_SPHINX=ON
+    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="$srcdir/clang-tools-extra"
     -DLLVM_EXTERNAL_LIT=/usr/bin/lit
     -DLLVM_INCLUDE_DOCS=ON
     -DLLVM_LINK_LLVM_DYLIB=ON
