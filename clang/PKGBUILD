@@ -75,7 +75,7 @@ build() {
     -DPYTHON_EXECUTABLE=python3 \
     -DSPHINX_OUTPUT_HTML:BOOL=OFF \
     -DSPHINX_WARNINGS_AS_ERRORS=OFF \
-    "${srcdir}/llvm-project"
+    "${srcdir}/llvm-project/llvm"
 
   ninja -j"$(nproc --all)"
 }
