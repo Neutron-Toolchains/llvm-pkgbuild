@@ -31,34 +31,14 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP')
 
-# Utilizing LLVM_DISTRIBUTION_COMPONENTS to avoid
-# installing static libraries; inspired by Gentoo
-_get_distribution_components() {
-  local target
-  ninja -t targets | grep -Po 'install-\K.*(?=-stripped:)' | while read -r target; do
-    case $target in
-      clang-libraries|distribution)
-        continue
-        ;;
-      clang-tidy-headers)
-        continue
-        ;;
-      clang|clangd|clang-*)
-        ;;
-      clang*|findAllSymbols)
-        continue
-        ;;
-    esac
-    echo $target
-  done
-}
-
 prepare() {
-  mv "$srcdir/clang-$pkgver.src" "clang"
-  mv "$srcdir/clang-tools-extra-$pkgver.src" "clang-tools-extra"
+  mv "$srcdir/clang-$pkgver.src" "${srcdir}/clang"
+  mv "$srcdir/clang-tools-extra-$pkgver.src" "${srcdir}/clang-tools-extra"
+  mv "${srcdir}/llvm-${pkgver}.src" "${srcdir}/llvm"
   patch -Np1 -i ../enable-fstack-protector-strong-by-default.patch
   patch -Np1 -i ../0001-Mark-fopenmp-implicit-rpath-as-NoArgumentUnused.patch
   patch -Np1 -i ../0001-clang-tools-extra-Make-test-dependency-on-LLVMHello-.patch
+  patch -Np1 -i <(curl -s "https://src.fedoraproject.org/rpms/clang/raw/rawhide/f/0003-PATCH-clang-Don-t-install-static-libraries.patch")
 
   # Attempt to convert script to Python 3
   2to3 -wn --no-diffs \
@@ -71,38 +51,37 @@ prepare() {
 build() {
   cd clang/build
 
-  local cmake_args=(
-    -G Ninja
-    -DCLANG_BUILD_EXAMPLES:BOOL=OFF
-    -DCLANG_DEFAULT_PIE_ON_LINUX=ON
-    -DCLANG_INCLUDE_DOCS:BOOL=ON
-    -DCLANG_INCLUDE_TESTS:BOOL=ON
-    -DCLANG_LINK_CLANG_DYLIB=ON
-    -DCMAKE_BUILD_TYPE=Release
-    -DCMAKE_INSTALL_DOCDIR=share/doc
-    -DCMAKE_INSTALL_PREFIX=/usr
-    -DCMAKE_SKIP_RPATH=ON
-    -DENABLE_LINKER_BUILD_ID=ON
-    -DLLVM_BUILD_DOCS=ON
-    -DLLVM_BUILD_TESTS=ON
-    -DLLVM_BUILD_UTILS:BOOL=ON
-    -DLLVM_ENABLE_RTTI=ON
-    -DLLVM_ENABLE_SPHINX=ON
-    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="$srcdir/clang-tools-extra"
-    -DLLVM_EXTERNAL_LIT=/usr/bin/lit
-    -DLLVM_INCLUDE_DOCS=ON
-    -DLLVM_LINK_LLVM_DYLIB=ON
-    -DLLVM_MAIN_SRC_DIR="$srcdir/llvm-$pkgver.src"
-    -DSPHINX_WARNINGS_AS_ERRORS=OFF
-  )
+  cmake -G Ninja -Wno-dev --log-level=NOTICE \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCLANG_BUILD_EXAMPLES:BOOL=OFF \
+    -DCLANG_DEFAULT_LINKER=lld \
+    -DCLANG_DEFAULT_PIE_ON_LINUX=ON \
+    -DCLANG_ENABLE_ARCMT:BOOL=ON \
+    -DCLANG_ENABLE_STATIC_ANALYZER:BOOL=ON \
+    -DCLANG_INCLUDE_DOCS:BOOL=ON \
+    -DCLANG_INCLUDE_TESTS:BOOL=ON \
+    -DCLANG_LINK_CLANG_DYLIB=ON \
+    -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_DOCDIR=share/doc \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_SKIP_RPATH:BOOL=ON \
+    -DENABLE_LINKER_BUILD_ID:BOOL=ON \
+    -DLLVM_BUILD_DOCS=ON \
+    -DLLVM_BUILD_UTILS:BOOL=ON \
+    -DLLVM_CMAKE_DIR="${srcdir}/llvm/cmake/llvm" \
+    -DLLVM_ENABLE_EH=ON \
+    -DLLVM_ENABLE_RTTI=ON \
+    -DLLVM_ENABLE_SPHINX=ON \
+    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${srcdir}/clang-tools-extra" \
+    -DLLVM_EXTERNAL_LIT=/usr/bin/lit \
+    -DLLVM_LINK_LLVM_DYLIB:BOOL=ON \
+    -DLLVM_MAIN_SRC_DIR="${srcdir}/llvm" \
+    -DPYTHON_EXECUTABLE=python3 \
+    -DSPHINX_WARNINGS_AS_ERRORS=OFF \
+    "${srcdir}/clang"
 
-  cmake .. "${cmake_args[@]}"
-  local distribution_components=$(_get_distribution_components | paste -sd\;)
-  test -n "$distribution_components"
-  cmake_args+=(-DLLVM_DISTRIBUTION_COMPONENTS="$distribution_components")
-
-  cmake .. "${cmake_args[@]}"
-  ninja
+  ninja -j"$(nproc --all)"
 }
 
 _python_optimize() {
@@ -112,7 +91,7 @@ _python_optimize() {
 }
 
 package() {
-  cd clang-$pkgver.src/build
+  cd "${srcdir}/clang/build"
 
   DESTDIR="$pkgdir" ninja install-distribution
   install -Dm644 ../LICENSE.TXT "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
